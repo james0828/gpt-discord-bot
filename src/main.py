@@ -52,7 +52,6 @@ async def on_ready():
         completion.MY_BOT_EXAMPLE_CONVOS.append(Conversation(messages=messages))
     await tree.sync()
 
-
 # /chat message:
 @tree.command(name="chat", description="Create a new thread for conversation")
 @discord.app_commands.checks.has_permissions(send_messages=True)
@@ -119,21 +118,20 @@ async def chat_command(int: discord.Interaction, message: str):
 
         # create the thread
         thread = await response.create_thread(
-            name=f"{ACTIVATE_THREAD_PREFX} {user.name[:20]} - {message[:30]}",
+            name=f"{ACTIVATE_THREAD_PREFX}###{message}",
             slowmode_delay=1,
-            reason="gpt-bot",
             auto_archive_duration=60,
         )
-        async with thread.typing():
-            # fetch completion
-            messages = [Message(user=user.name, text=message)]
-            response_data = await generate_completion_response(
-                messages=messages, user=user
-            )
-            # send the result
-            await process_response(
-                user=user, thread=thread, response_data=response_data
-            )
+        # async with thread.typing():
+        #     # fetch completion
+        #     messages = [Message(user=user.name, text=message)]
+        #     response_data = await generate_completion_response(
+        #         messages=messages, user=user
+        #     )
+        #     # send the result
+        #     await process_response(
+        #         user=user, thread=thread, response_data=response_data
+        #     )
     except Exception as e:
         logger.exception(e)
         await int.response.send_message(
@@ -172,10 +170,10 @@ async def on_message(message: DiscordMessage):
             # ignore this thread
             return
 
-        if thread.message_count > MAX_THREAD_MESSAGES:
-            # too many messages, no longer going to reply
-            await close_thread(thread=thread)
-            return
+        # if thread.message_count > MAX_THREAD_MESSAGES:
+        #     # too many messages, no longer going to reply
+        #     await close_thread(thread=thread)
+        #     return
 
         # moderate the message
         flagged_str, blocked_str = moderate_message(
@@ -235,6 +233,8 @@ async def on_message(message: DiscordMessage):
             f"Thread message to process - {message.author}: {message.content[:50]} - {thread.name} {thread.jump_url}"
         )
 
+        print(message)
+
         channel_messages = [
             discord_message_to_message(message)
             async for message in thread.history(limit=MAX_THREAD_MESSAGES)
@@ -245,7 +245,7 @@ async def on_message(message: DiscordMessage):
         # generate the response
         async with thread.typing():
             response_data = await generate_completion_response(
-                messages=channel_messages, user=message.author
+                system_message=thread.name.split('###')[1], messages=channel_messages, user=message.author
             )
 
         if is_last_message_stale(
